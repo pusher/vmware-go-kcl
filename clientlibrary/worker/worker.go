@@ -263,13 +263,22 @@ func (w *Worker) eventLoop() {
 			if shard.GetLeaseOwner() == w.workerID && shard.Checkpoint != chk.SHARD_END {
 				counter++
 			}
+			log.Infof(
+				"Examining leases we hold. shard: %s, lease holder: %s, checkpoint: %s, counter: %d",
+				shard.ID,
+				shard.GetLeaseOwner(),
+				shard.Checkpoint,
+				counter,
+			)
 		}
 
 		// max number of lease has not been reached yet
 		if counter < w.kclConfig.MaxLeasesForWorker {
 			for _, shard := range w.shardStatus {
+				log.Infof("considering shard %s", shard.ID)
 				// already owner of the shard
 				if shard.GetLeaseOwner() == w.workerID {
+					log.Infof("shard %s is already ours", shard.ID)
 					continue
 				}
 
@@ -285,6 +294,7 @@ func (w *Worker) eventLoop() {
 
 				// The shard is closed and we have processed all records
 				if shard.Checkpoint == chk.SHARD_END {
+					log.Infof("shard %s is finished", shard.ID)
 					continue
 				}
 
@@ -293,6 +303,8 @@ func (w *Worker) eventLoop() {
 					// cannot get lease on the shard
 					if err.Error() != chk.ErrLeaseNotAquired {
 						log.Errorf("Cannot get lease: %+v", err)
+					} else {
+						log.Warnf("Lease not acquired: %+v", err)
 					}
 					continue
 				}

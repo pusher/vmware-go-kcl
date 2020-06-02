@@ -1,0 +1,33 @@
+14:58:31.288 time="2020-06-01T13:58:31Z" level=info msg="Creating DynamoDB session" component=kcl
+14:58:31.288 time="2020-06-01T13:58:31Z" level=info msg="Worker initialization in progress..." component=kcl
+14:58:31.288 time="2020-06-01T13:58:31Z" level=info msg="Worker initialization in progress..." component=kcl
+14:58:31.288 time="2020-06-01T13:58:31Z" level=info msg="Initializing Checkpointer" component=kcl
+14:58:31.288 time="2020-06-01T13:58:31Z" level=info msg="Creating DynamoDB based checkpointer" component=kcl
+14:58:31.288 time="2020-06-01T13:58:31Z" level=info msg="Creating Kinesis session" component=kcl
+14:58:33.124 time="2020-06-01T13:58:33Z" level=info msg="Initialization complete." component=kcl
+14:58:33.124 time="2020-06-01T13:58:33Z" level=info msg="Starting worker event loop." component=kcl
+14:58:33.124 time="2020-06-01T13:58:33Z" level=info msg="Starting monitoring service." component=kcl
+14:58:33.171 time="2020-06-01T13:58:33Z" level=info msg="Found 4 shards" component=kcl
+14:58:33.171 time="2020-06-01T13:58:33Z" level=info msg="Found new shard with id shardId-000000000006" component=kcl
+14:58:33.171 time="2020-06-01T13:58:33Z" level=info msg="Found new shard with id shardId-000000000004" component=kcl
+14:58:33.171 time="2020-06-01T13:58:33Z" level=info msg="Found new shard with id shardId-000000000003" component=kcl
+14:58:33.171 time="2020-06-01T13:58:33Z" level=info msg="Found new shard with id shardId-000000000005" component=kcl
+14:58:33.207 time="2020-06-01T13:58:33Z" level=info msg="Start Shard Consumer for shard: shardId-000000000004" component=kcl
+14:58:39.011 time="2020-06-01T13:58:39Z" level=info msg="Start Shard Consumer for shard: shardId-000000000003" component=kcl
+14:58:45.033 time="2020-06-01T13:58:45Z" level=info msg="Start Shard Consumer for shard: shardId-000000000005" component=kcl
+14:58:54.004 time="2020-06-01T13:58:54Z" level=info msg="Start Shard Consumer for shard: shardId-000000000006" component=kcl
+
+18:18:25.160 time="2020-06-01T17:18:25Z" level=error msg="Error in refreshing lease on shard: shardId-000000000006 for worker: f9ef13cc-a40f-11ea-9602-0a580a020807. Error: ProvisionedThroughputExceededException: The level of configured provisioned throughput for the table was exceeded. Consider increasing your provisioning level with the UpdateTable API.\n\tstatus code: 400, request id: L2C5UCK9A01ULRHMEDEVJ3N7P7VV4KQNSO5AEMVJF66Q9ASUAAJG" component=kcl
+18:18:25.160 time="2020-06-01T17:18:25Z" level=info msg="Release lease for shard shardId-000000000006" component=kcl
+18:18:26.040 time="2020-06-01T17:18:26Z" level=info msg="Start Shard Consumer for shard: shardId-000000000006" component=kcl
+18:18:27.620 time="2020-06-01T17:18:27Z" level=error msg="Error in getRecords: ProvisionedThroughputExceededException: The level of configured provisioned throughput for the table was exceeded. Consider increasing your provisioning level with the UpdateTable API.\n\tstatus code: 400, request id: L2C5UCK9A01ULRHMEDEVJ3N7P7VV4KQNSO5AEMVJF66Q9ASUAAJG" component=kcl
+
+19:07:24.839 time="2020-06-01T18:07:24Z" level=info msg="Release lease for shard shardId-000000000005" component=kcl
+19:07:24.839 time="2020-06-01T18:07:24Z" level=error msg="Error in refreshing lease on shard: shardId-000000000005 for worker: f9ef13cc-a40f-11ea-9602-0a580a020807. Error: ProvisionedThroughputExceededException: The level of configured provisioned throughput for the table was exceeded. Consider increasing your provisioning level with the UpdateTable API.\n\tstatus code: 400, request id: O67L5BM9AFTCCGB0S8TCAQU58FVV4KQNSO5AEMVJF66Q9ASUAAJG" component=kcl
+19:07:29.787 time="2020-06-01T18:07:29Z" level=info msg="Start Shard Consumer for shard: shardId-000000000005" component=kcl
+19:07:30.495 time="2020-06-01T18:07:30Z" level=error msg="Error in getRecords: ProvisionedThroughputExceededException: The level of configured provisioned throughput for the table was exceeded. Consider increasing your provisioning level with the UpdateTable API.\n\tstatus code: 400, request id: O67L5BM9AFTCCGB0S8TCAQU58FVV4KQNSO5AEMVJF66Q9ASUAAJG" component=kcl
+
+20:26:55.975 time="2020-06-01T19:26:55Z" level=error msg="Error in refreshing lease on shard: shardId-000000000006 for worker: f9ef13cc-a40f-11ea-9602-0a580a020807. Error: ProvisionedThroughputExceededException: The level of configured provisioned throughput for the table was exceeded. Consider increasing your provisioning level with the UpdateTable API.\n\tstatus code: 400, request id: JOCJLCFB9O0HQFKL0Q3ITAC2NBVV4KQNSO5AEMVJF66Q9ASUAAJG" component=kcl
+20:26:55.975 time="2020-06-01T19:26:55Z" level=info msg="Release lease for shard shardId-000000000006" component=kcl
+20:26:58.186 time="2020-06-01T19:26:58Z" level=error msg="Error in getRecords: ProvisionedThroughputExceededException: The level of configured provisioned throughput for the table was exceeded. Consider increasing your provisioning level with the UpdateTable API.\n\tstatus code: 400, request id: JOCJLCFB9O0HQFKL0Q3ITAC2NBVV4KQNSO5AEMVJF66Q9ASUAAJG" component=kcl
+
