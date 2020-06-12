@@ -33,9 +33,15 @@ import (
 )
 
 const (
-	// ErrLeaseNotAquired is returned when we failed to get a lock on the shard
-	ErrLeaseNotAquired = "Lease is already held by another node"
+	ErrDescLeaseNotAquired    = "Lease is already held by another node"
+	ErrDescSequenceIDNotFound = "SequenceIDNotFoundForShard"
 )
+
+// ErrLeaseNotAquired is returned when we failed to get a lock on the shard
+var ErrLeaseNotAquired = errors.New(ErrDescLeaseNotAquired)
+
+// ErrSequenceIDNotFound is returned by FetchCheckpoint when no SequenceID is found
+var ErrSequenceIDNotFound = errors.New(ErrDescSequenceIDNotFound)
 
 // Checkpointer handles checkpointing when a record has been processed
 type Checkpointer interface {
@@ -57,6 +63,3 @@ type Checkpointer interface {
 	// RemoveLeaseOwner to remove lease owner for the shard entry to make the shard available for reassignment
 	RemoveLeaseOwner(string) error
 }
-
-// ErrSequenceIDNotFound is returned by FetchCheckpoint when no SequenceID is found
-var ErrSequenceIDNotFound = errors.New("SequenceIDNotFoundForShard")

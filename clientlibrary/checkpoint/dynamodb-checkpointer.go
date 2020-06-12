@@ -28,7 +28,6 @@
 package checkpoint
 
 import (
-	"errors"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -145,7 +144,7 @@ func (checkpointer *DynamoCheckpoint) GetLease(shard *par.ShardStatus, newAssign
 		}
 
 		if time.Now().UTC().Before(currentLeaseTimeout) && assignedTo != newAssignTo {
-			return errors.New(ErrLeaseNotAquired)
+			return ErrLeaseNotAquired
 		}
 
 		checkpointer.log.Debugf("Attempting to get a lock for shard: %s, leaseTimeout: %s, assignedTo: %s", shard.ID, currentLeaseTimeout, assignedTo)
@@ -189,7 +188,7 @@ func (checkpointer *DynamoCheckpoint) GetLease(shard *par.ShardStatus, newAssign
 	if err != nil {
 		if awsErr, ok := err.(awserr.Error); ok {
 			if awsErr.Code() == dynamodb.ErrCodeConditionalCheckFailedException {
-				return errors.New(ErrLeaseNotAquired)
+				return ErrLeaseNotAquired
 			}
 		}
 		return err
