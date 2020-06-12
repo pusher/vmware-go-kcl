@@ -200,7 +200,7 @@ func (w *Worker) initialize() error {
 	}
 
 	log.Infof("Initializing Checkpointer")
-	if err := w.checkpointer.Init(); err != nil {
+	if err := w.checkpointer.Init(w.workerID); err != nil {
 		log.Errorf("Failed to start Checkpointer: %+v", err)
 		return err
 	}
@@ -288,7 +288,7 @@ func (w *Worker) eventLoop() {
 					continue
 				}
 
-				err = w.checkpointer.GetLease(shard, w.workerID)
+				err = w.checkpointer.GetLease(shard)
 				if err != nil {
 					// cannot get lease on the shard
 					if err != chk.ErrLeaseNotAquired {

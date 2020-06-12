@@ -70,21 +70,23 @@ func TestGetLeaseNotAquired(t *testing.T) {
 		WithFailoverTimeMillis(300000)
 
 	checkpoint := NewDynamoCheckpoint(kclConfig).WithDynamoDB(svc)
-	checkpoint.Init()
+	checkpoint.Init("abcd-efgh")
 	err := checkpoint.GetLease(&par.ShardStatus{
 		ID:         "0001",
 		Checkpoint: "",
 		Mux:        &sync.Mutex{},
-	}, "abcd-efgh")
+	})
 	if err != nil {
 		t.Errorf("Error getting lease %s", err)
 	}
 
-	err = checkpoint.GetLease(&par.ShardStatus{
+	checkpoint2 := NewDynamoCheckpoint(kclConfig).WithDynamoDB(svc)
+	checkpoint2.Init("ijkl-mnop")
+	err = checkpoint2.GetLease(&par.ShardStatus{
 		ID:         "0001",
 		Checkpoint: "",
 		Mux:        &sync.Mutex{},
-	}, "ijkl-mnop")
+	})
 	if err == nil || err != ErrLeaseNotAquired {
 		t.Errorf("Got a lease when it was already held by abcd-efgh: %s", err)
 	}
@@ -100,13 +102,15 @@ func TestGetLeaseAquired(t *testing.T) {
 		WithFailoverTimeMillis(300000)
 
 	checkpoint := NewDynamoCheckpoint(kclConfig).WithDynamoDB(svc)
-	checkpoint.Init()
+	existingWorkerID := "abcd-efgh"
+	thisWorkerID := "ijkl-mnop"
+	checkpoint.Init(thisWorkerID)
 	marshalledCheckpoint := map[string]*dynamodb.AttributeValue{
 		"ShardID": {
 			S: aws.String("0001"),
 		},
 		"AssignedTo": {
-			S: aws.String("abcd-efgh"),
+			S: aws.String(existingWorkerID),
 		},
 		"LeaseTimeout": {
 			S: aws.String(time.Now().AddDate(0, -1, 0).UTC().Format(time.RFC3339)),
@@ -125,7 +129,7 @@ func TestGetLeaseAquired(t *testing.T) {
 		Checkpoint: "deadbeef",
 		Mux:        &sync.Mutex{},
 	}
-	err := checkpoint.GetLease(shard, "ijkl-mnop")
+	err := checkpoint.GetLease(shard)
 
 	if err != nil {
 		t.Errorf("Lease not aquired after timeout %s", err)

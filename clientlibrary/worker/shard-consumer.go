@@ -171,7 +171,7 @@ func (sc *ShardConsumer) getRecords(shard *par.ShardStatus) error {
 	for {
 		if time.Now().UTC().After(shard.LeaseTimeout.Add(-time.Duration(sc.kclConfig.LeaseRefreshPeriodMillis) * time.Millisecond)) {
 			log.Debugf("Refreshing lease on shard: %s for worker: %s", shard.ID, sc.consumerID)
-			err = sc.checkpointer.GetLease(shard, sc.consumerID)
+			err = sc.checkpointer.GetLease(shard)
 			if err != nil {
 				if err == chk.ErrLeaseNotAquired {
 					log.Warnf("Failed in acquiring lease on shard: %s for worker: %s", shard.ID, sc.consumerID)

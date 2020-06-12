@@ -46,10 +46,10 @@ var ErrSequenceIDNotFound = errors.New(ErrDescSequenceIDNotFound)
 // Checkpointer handles checkpointing when a record has been processed
 type Checkpointer interface {
 	// Init initialises the Checkpoint
-	Init() error
+	Init(workerID string) error
 
 	// GetLease attempts to gain a lock on the given shard
-	GetLease(*par.ShardStatus, string) error
+	GetLease(*par.ShardStatus) error
 
 	// CheckpointSequence writes a checkpoint at the designated sequence ID
 	CheckpointSequence(*par.ShardStatus) error

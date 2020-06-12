@@ -66,6 +66,7 @@ type DynamoCheckpoint struct {
 	leaseTableReadCapacity  int64
 	leaseTableWriteCapacity int64
 
+	workerID      string
 	LeaseDuration int
 	svc           dynamodbiface.DynamoDBAPI
 	kclConfig     *config.KinesisClientLibConfiguration
@@ -93,8 +94,10 @@ func (checkpointer *DynamoCheckpoint) WithDynamoDB(svc dynamodbiface.DynamoDBAPI
 }
 
 // Init initialises the DynamoDB Checkpoint
-func (checkpointer *DynamoCheckpoint) Init() error {
+func (checkpointer *DynamoCheckpoint) Init(workerID string) error {
 	checkpointer.log.Infof("Creating DynamoDB session")
+
+	checkpointer.workerID = workerID
 
 	s, err := session.NewSession(&aws.Config{
 		Region:      aws.String(checkpointer.kclConfig.RegionName),
@@ -119,7 +122,7 @@ func (checkpointer *DynamoCheckpoint) Init() error {
 }
 
 // GetLease attempts to gain a lock on the given shard
-func (checkpointer *DynamoCheckpoint) GetLease(shard *par.ShardStatus, newAssignTo string) error {
+func (checkpointer *DynamoCheckpoint) GetLease(shard *par.ShardStatus) error {
 	newLeaseTimeout := time.Now().Add(time.Duration(checkpointer.LeaseDuration) * time.Millisecond).UTC()
 	newLeaseTimeoutString := newLeaseTimeout.Format(time.RFC3339)
 	currentCheckpoint, err := checkpointer.getItem(shard.ID)
@@ -143,7 +146,7 @@ func (checkpointer *DynamoCheckpoint) GetLease(shard *par.ShardStatus, newAssign
 			return err
 		}
 
-		if time.Now().UTC().Before(currentLeaseTimeout) && assignedTo != newAssignTo {
+		if time.Now().UTC().Before(currentLeaseTimeout) && assignedTo != checkpointer.workerID {
 			return ErrLeaseNotAquired
 		}
 
@@ -167,7 +170,7 @@ func (checkpointer *DynamoCheckpoint) GetLease(shard *par.ShardStatus, newAssign
 			S: aws.String(shard.ID),
 		},
 		LEASE_OWNER_KEY: {
-			S: aws.String(newAssignTo),
+			S: aws.String(checkpointer.workerID),
 		},
 		LEASE_TIMEOUT_KEY: {
 			S: aws.String(newLeaseTimeoutString),
@@ -195,7 +198,7 @@ func (checkpointer *DynamoCheckpoint) GetLease(shard *par.ShardStatus, newAssign
 	}
 
 	shard.Mux.Lock()
-	shard.AssignedTo = newAssignTo
+	shard.AssignedTo = checkpointer.workerID
 	shard.LeaseTimeout = newLeaseTimeout
 	shard.Mux.Unlock()
 
