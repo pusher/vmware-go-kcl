@@ -177,6 +177,36 @@ func TestLeaseCanBeRelinquished(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+func TestCannotRelinquishAnotherWorkersLease(t *testing.T) {
+	dynamo := newDynamoClient(t)
+	otherCheckpoint := newTestSubject(t, dynamo)
+	otherCheckpoint.Init("other-worker")
+
+	// the other worker already holds the lease
+	err := otherCheckpoint.GetLease(&par.ShardStatus{
+		ID:         SHARD_ID,
+		Checkpoint: "",
+		Mux:        &sync.Mutex{},
+	})
+	assert.Nil(t, err)
+
+	checkpoint := newTestSubject(t, dynamo)
+	checkpoint.Init("test-worker")
+
+	// try to give up the lease when we don't own it
+	err = checkpoint.RemoveLeaseOwner(SHARD_ID)
+	assert.NotNil(t, err, "Removing another lease owner did not fail")
+
+	// ensure that the lease still belongs to the other worker and that
+	// we still can't take it ourselves
+	err = checkpoint.GetLease(&par.ShardStatus{
+		ID:         SHARD_ID,
+		Checkpoint: "",
+		Mux:        &sync.Mutex{},
+	})
+	assert.Equal(t, ErrLeaseNotAquired, err, "Was granted lease which should not have been available")
+}
+
 func newTestSubject(t *testing.T, dynamo *testDynamoClient) *DynamoCheckpoint {
 	kclConfig := cfg.NewKinesisClientLibConfig("appName", "test", "local", "abc").
 		WithInitialPositionInStream(cfg.LATEST).
