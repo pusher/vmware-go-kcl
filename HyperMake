@@ -34,11 +34,20 @@ targets:
   test:
     description: run unit tests
     after:
-      - deps
-      - check
+      - startdynamo
     always: true
+    link:
+      - 'dynamo:dynamo'
+    net: 'kcltest'
     cmds:
       - ./support/scripts/test.sh
+
+  startdynamo:
+    description: start dynamodb-local in the background
+    after:
+      - deps
+      - check
+    compose: test/docker-compose.yml
 
   ci:
     description: run CI tests
