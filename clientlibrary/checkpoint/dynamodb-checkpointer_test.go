@@ -44,13 +44,25 @@ import (
 	par "github.com/vmware/vmware-go-kcl/clientlibrary/partition"
 )
 
-func TestDoesTableExist(t *testing.T) {
+const (
+	FAILOVER_TIME_MILLIS = 30000
+	SYNC_INTERVAL_MILLIS = 5000
+
+	SHARD_ID = "0001"
+)
+
+func TestTableDoesNotExist(t *testing.T) {
 	dynamo := newDynamoClient(t)
 	checkpoint := newTestSubject(t, dynamo)
 
 	if checkpoint.doesTableExist() {
 		t.Error("Table does not exist but returned true")
 	}
+}
+
+func TestTableCreatedOnInit(t *testing.T) {
+	dynamo := newDynamoClient(t)
+	checkpoint := newTestSubject(t, dynamo)
 
 	err := checkpoint.Init("test-worker")
 	assert.Nil(t, err)
@@ -60,76 +72,109 @@ func TestDoesTableExist(t *testing.T) {
 	}
 }
 
-func TestGetLeaseNotAquired(t *testing.T) {
+func TestLeaseAcquiredOnEmptyTable(t *testing.T) {
 	dynamo := newDynamoClient(t)
 	checkpoint := newTestSubject(t, dynamo)
-	checkpoint.createTable()
-	checkpoint.Init("abcd-efgh")
-	err := checkpoint.GetLease(&par.ShardStatus{
-		ID:         "0001",
-		Checkpoint: "",
-		Mux:        &sync.Mutex{},
-	})
-	if err != nil {
-		t.Errorf("Error getting lease %s", err)
-	}
+	checkpoint.Init("test-worker")
 
-	checkpoint2 := newTestSubject(t, dynamo)
-	checkpoint2.Init("ijkl-mnop")
-	err = checkpoint2.GetLease(&par.ShardStatus{
-		ID:         "0001",
+	err := checkpoint.GetLease(&par.ShardStatus{
+		ID:         SHARD_ID,
 		Checkpoint: "",
 		Mux:        &sync.Mutex{},
 	})
-	if err == nil || err != ErrLeaseNotAquired {
-		t.Errorf("Got a lease when it was already held by abcd-efgh: %s", err)
-	}
+	assert.Nil(t, err, "Did not get lease on empty table")
 }
 
-func TestGetLeaseAquired(t *testing.T) {
+func TestLeaseAcquiredOnExpiredExistingRow(t *testing.T) {
 	dynamo := newDynamoClient(t)
 	checkpoint := newTestSubject(t, dynamo)
-	thisWorkerID := "ijkl-mnop"
-	checkpoint.Init(thisWorkerID)
+	checkpoint.Init("test-worker")
 
-	existingWorkerID := "abcd-efgh"
-	shardID := "0001"
-	dynamo.createInitialStateRecord(t, shardID, "deadbeef", existingWorkerID, time.Now().AddDate(0, -1, 0))
+	dynamo.createInitialStateRecord(
+		t,
+		SHARD_ID,
+		"",
+		"other-worker",
+		time.Now().Add(-1*time.Second),
+	)
 
-	shard := &par.ShardStatus{
-		ID:         "0001",
-		Checkpoint: "deadbeef",
+	err := checkpoint.GetLease(&par.ShardStatus{
+		ID:         SHARD_ID,
+		Checkpoint: "",
 		Mux:        &sync.Mutex{},
-	}
-	err := checkpoint.GetLease(shard)
+	})
+	assert.Nil(t, err, "Did not get lease on top of expired record")
+}
 
-	if err != nil {
-		t.Errorf("Lease not aquired after timeout %s", err)
-	}
+func TestLeaseNotAcquiredOnCurrentExistingRow(t *testing.T) {
+	dynamo := newDynamoClient(t)
+	checkpoint := newTestSubject(t, dynamo)
+	checkpoint.Init("test-worker")
 
-	status := &par.ShardStatus{
-		ID:  shard.ID,
-		Mux: &sync.Mutex{},
-	}
-	checkpoint.FetchCheckpoint(status)
-	assert.Equal(t, "deadbeef", status.Checkpoint)
+	dynamo.createInitialStateRecord(
+		t,
+		SHARD_ID,
+		"",
+		"other-worker",
+		time.Now().Add(0.5*FAILOVER_TIME_MILLIS*time.Millisecond),
+	)
 
-	// release owner info
-	err = checkpoint.RemoveLeaseOwner(shard.ID)
+	err := checkpoint.GetLease(&par.ShardStatus{
+		ID:         SHARD_ID,
+		Checkpoint: "",
+		Mux:        &sync.Mutex{},
+	})
+	assert.Equal(t, ErrLeaseNotAquired, err, "Was granted lease which was already owned")
+}
+
+func TestLeaseNotAcquiredByCompetingCheckpointer(t *testing.T) {
+	dynamo := newDynamoClient(t)
+	checkpoint := newTestSubject(t, dynamo)
+	checkpoint.Init("test-worker")
+
+	err := checkpoint.GetLease(&par.ShardStatus{
+		ID:         SHARD_ID,
+		Checkpoint: "",
+		Mux:        &sync.Mutex{},
+	})
 	assert.Nil(t, err)
 
-	status = &par.ShardStatus{
-		ID:  shard.ID,
-		Mux: &sync.Mutex{},
-	}
-	checkpoint.FetchCheckpoint(status)
+	otherCheckpoint := newTestSubject(t, dynamo)
+	otherCheckpoint.Init("other-worker")
+	err = otherCheckpoint.GetLease(&par.ShardStatus{
+		ID:         SHARD_ID,
+		Checkpoint: "",
+		Mux:        &sync.Mutex{},
+	})
+	assert.Equal(t, ErrLeaseNotAquired, err, "Was granted lease which was already owned")
+}
 
-	// checkpointer and parent shard id should be the same
-	assert.Equal(t, shard.Checkpoint, status.Checkpoint)
-	assert.Equal(t, shard.ParentShardId, status.ParentShardId)
+func TestLeaseCanBeRelinquished(t *testing.T) {
+	dynamo := newDynamoClient(t)
+	checkpoint := newTestSubject(t, dynamo)
+	checkpoint.Init("test-worker")
 
-	// Only the lease owner has been wiped out
-	assert.Equal(t, "", status.GetLeaseOwner())
+	// take the lease
+	err := checkpoint.GetLease(&par.ShardStatus{
+		ID:         SHARD_ID,
+		Checkpoint: "",
+		Mux:        &sync.Mutex{},
+	})
+	assert.Nil(t, err)
+
+	// give up the lease
+	err = checkpoint.RemoveLeaseOwner(SHARD_ID)
+	assert.Nil(t, err)
+
+	// lease should be available to another checkpointer
+	otherCheckpoint := newTestSubject(t, dynamo)
+	otherCheckpoint.Init("other-worker")
+	err = otherCheckpoint.GetLease(&par.ShardStatus{
+		ID:         SHARD_ID,
+		Checkpoint: "",
+		Mux:        &sync.Mutex{},
+	})
+	assert.Nil(t, err)
 }
 
 func newTestSubject(t *testing.T, dynamo *testDynamoClient) *DynamoCheckpoint {
@@ -137,8 +182,8 @@ func newTestSubject(t *testing.T, dynamo *testDynamoClient) *DynamoCheckpoint {
 		WithInitialPositionInStream(cfg.LATEST).
 		WithMaxRecords(10).
 		WithMaxLeasesForWorker(1).
-		WithShardSyncIntervalMillis(5000).
-		WithFailoverTimeMillis(300000).
+		WithShardSyncIntervalMillis(SYNC_INTERVAL_MILLIS).
+		WithFailoverTimeMillis(FAILOVER_TIME_MILLIS).
 		WithTableName(dynamo.tableName)
 
 	return NewDynamoCheckpoint(kclConfig).WithDynamoDB(dynamo)
