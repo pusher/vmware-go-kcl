@@ -45,7 +45,8 @@ import (
 )
 
 func TestDoesTableExist(t *testing.T) {
-	checkpoint := newTestSubject(t)
+	dynamo := newDynamoClient(t)
+	checkpoint := newTestSubject(t, dynamo)
 
 	if checkpoint.doesTableExist() {
 		t.Error("Table does not exist but returned true")
@@ -60,7 +61,8 @@ func TestDoesTableExist(t *testing.T) {
 }
 
 func TestGetLeaseNotAquired(t *testing.T) {
-	checkpoint := newTestSubject(t)
+	dynamo := newDynamoClient(t)
+	checkpoint := newTestSubject(t, dynamo)
 	checkpoint.createTable()
 	checkpoint.Init("abcd-efgh")
 	err := checkpoint.GetLease(&par.ShardStatus{
@@ -72,7 +74,7 @@ func TestGetLeaseNotAquired(t *testing.T) {
 		t.Errorf("Error getting lease %s", err)
 	}
 
-	checkpoint2 := newTestSubject(t)
+	checkpoint2 := newTestSubject(t, dynamo)
 	checkpoint2.Init("ijkl-mnop")
 	err = checkpoint2.GetLease(&par.ShardStatus{
 		ID:         "0001",
@@ -85,38 +87,21 @@ func TestGetLeaseNotAquired(t *testing.T) {
 }
 
 func TestGetLeaseAquired(t *testing.T) {
-	existingWorkerID := "abcd-efgh"
-	checkpoint := newTestSubject(t)
+	dynamo := newDynamoClient(t)
+	checkpoint := newTestSubject(t, dynamo)
 	thisWorkerID := "ijkl-mnop"
 	checkpoint.Init(thisWorkerID)
 
-	marshalledCheckpoint := map[string]*dynamodb.AttributeValue{
-		"ShardID": {
-			S: aws.String("0001"),
-		},
-		"AssignedTo": {
-			S: aws.String(existingWorkerID),
-		},
-		"LeaseTimeout": {
-			S: aws.String(time.Now().AddDate(0, -1, 0).UTC().Format(time.RFC3339)),
-		},
-		"SequenceID": {
-			S: aws.String("deadbeef"),
-		},
-	}
-	input := &dynamodb.PutItemInput{
-		TableName: aws.String(checkpoint.kclConfig.TableName),
-		Item:      marshalledCheckpoint,
-	}
-	_, err := checkpoint.svc.PutItem(input)
-	assert.Nil(t, err)
+	existingWorkerID := "abcd-efgh"
+	shardID := "0001"
+	dynamo.createInitialStateRecord(t, shardID, "deadbeef", existingWorkerID, time.Now().AddDate(0, -1, 0))
 
 	shard := &par.ShardStatus{
 		ID:         "0001",
 		Checkpoint: "deadbeef",
 		Mux:        &sync.Mutex{},
 	}
-	err = checkpoint.GetLease(shard)
+	err := checkpoint.GetLease(shard)
 
 	if err != nil {
 		t.Errorf("Lease not aquired after timeout %s", err)
@@ -147,21 +132,19 @@ func TestGetLeaseAquired(t *testing.T) {
 	assert.Equal(t, "", status.GetLeaseOwner())
 }
 
-func newTestSubject(t *testing.T) *DynamoCheckpoint {
-	svc := localDynamoClient(t)
-
+func newTestSubject(t *testing.T, dynamo *testDynamoClient) *DynamoCheckpoint {
 	kclConfig := cfg.NewKinesisClientLibConfig("appName", "test", "local", "abc").
 		WithInitialPositionInStream(cfg.LATEST).
 		WithMaxRecords(10).
 		WithMaxLeasesForWorker(1).
 		WithShardSyncIntervalMillis(5000).
 		WithFailoverTimeMillis(300000).
-		WithTableName(t.Name())
+		WithTableName(dynamo.tableName)
 
-	return NewDynamoCheckpoint(kclConfig).WithDynamoDB(svc)
+	return NewDynamoCheckpoint(kclConfig).WithDynamoDB(dynamo)
 }
 
-func localDynamoClient(t *testing.T) dynamodbiface.DynamoDBAPI {
+func newDynamoClient(t *testing.T) *testDynamoClient {
 	s, err := session.NewSession(&aws.Config{
 		Region:      aws.String("local"),
 		Endpoint:    aws.String("dynamo:8000"),
@@ -175,5 +158,42 @@ func localDynamoClient(t *testing.T) dynamodbiface.DynamoDBAPI {
 		t.Fatalf("Failed in getting DynamoDB session for test")
 	}
 
-	return dynamodb.New(s)
+	return &testDynamoClient{
+		DynamoDBAPI: dynamodb.New(s),
+		tableName:   t.Name(),
+	}
+}
+
+type testDynamoClient struct {
+	dynamodbiface.DynamoDBAPI
+	tableName string
+}
+
+func (d *testDynamoClient) createInitialStateRecord(
+	t *testing.T,
+	shardID string,
+	checkpoint string,
+	assignedTo string,
+	leaseTimeout time.Time,
+) {
+	marshalled := map[string]*dynamodb.AttributeValue{
+		LEASE_KEY_KEY: {
+			S: aws.String(shardID),
+		},
+		LEASE_OWNER_KEY: {
+			S: aws.String(assignedTo),
+		},
+		LEASE_TIMEOUT_KEY: {
+			S: aws.String(leaseTimeout.UTC().Format(time.RFC3339)),
+		},
+		CHECKPOINT_SEQUENCE_NUMBER_KEY: {
+			S: aws.String(checkpoint),
+		},
+	}
+	input := &dynamodb.PutItemInput{
+		TableName: aws.String(d.tableName),
+		Item:      marshalled,
+	}
+	_, err := d.PutItem(input)
+	assert.Nil(t, err)
 }
