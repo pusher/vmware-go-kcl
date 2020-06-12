@@ -44,6 +44,15 @@ import (
 )
 
 const (
+	LEASE_KEY_KEY                  = "ShardID"
+	LEASE_OWNER_KEY                = "AssignedTo"
+	LEASE_TIMEOUT_KEY              = "LeaseTimeout"
+	CHECKPOINT_SEQUENCE_NUMBER_KEY = "Checkpoint"
+	PARENT_SHARD_ID_KEY            = "ParentShardId"
+
+	// We've completely processed all records in this shard.
+	SHARD_END = "SHARD_END"
+
 	// ErrInvalidDynamoDBSchema is returned when there are one or more fields missing from the table
 	ErrInvalidDynamoDBSchema = "The DynamoDB schema is invalid and may need to be re-created"
 
