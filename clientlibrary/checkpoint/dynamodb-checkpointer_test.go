@@ -71,7 +71,7 @@ func TestTableDoesNotExistBeforeInit(t *testing.T) {
 
 func TestTableCreatedOnInit(t *testing.T) {
 	dynamo := newDynamoClient(t)
-	checkpoint := newTestSubject(t, "test-worker", dynamo)
+	checkpoint := newCheckpointer(t, "test-worker", dynamo)
 
 	if !checkpoint.doesTableExist() {
 		t.Error("Table exists but returned false")
@@ -80,7 +80,7 @@ func TestTableCreatedOnInit(t *testing.T) {
 
 func TestLeaseAcquiredOnEmptyTable(t *testing.T) {
 	dynamo := newDynamoClient(t)
-	checkpoint := newTestSubject(t, "test-worker", dynamo)
+	checkpoint := newCheckpointer(t, "test-worker", dynamo)
 
 	err := checkpoint.GetLease(&par.ShardStatus{
 		ID:         SHARD_ID,
@@ -92,7 +92,7 @@ func TestLeaseAcquiredOnEmptyTable(t *testing.T) {
 
 func TestLeaseAcquiredOnExpiredExistingRow(t *testing.T) {
 	dynamo := newDynamoClient(t)
-	checkpoint := newTestSubject(t, "test-worker", dynamo)
+	checkpoint := newCheckpointer(t, "test-worker", dynamo)
 
 	dynamo.createInitialStateRecord(
 		t,
@@ -112,7 +112,7 @@ func TestLeaseAcquiredOnExpiredExistingRow(t *testing.T) {
 
 func TestLeaseNotAcquiredOnCurrentExistingRow(t *testing.T) {
 	dynamo := newDynamoClient(t)
-	checkpoint := newTestSubject(t, "test-worker", dynamo)
+	checkpoint := newCheckpointer(t, "test-worker", dynamo)
 
 	dynamo.createInitialStateRecord(
 		t,
@@ -132,7 +132,7 @@ func TestLeaseNotAcquiredOnCurrentExistingRow(t *testing.T) {
 
 func TestLeaseNotAcquiredByCompetingCheckpointer(t *testing.T) {
 	dynamo := newDynamoClient(t)
-	checkpoint := newTestSubject(t, "test-worker", dynamo)
+	checkpoint := newCheckpointer(t, "test-worker", dynamo)
 
 	err := checkpoint.GetLease(&par.ShardStatus{
 		ID:         SHARD_ID,
@@ -141,7 +141,7 @@ func TestLeaseNotAcquiredByCompetingCheckpointer(t *testing.T) {
 	})
 	assert.Nil(t, err)
 
-	otherCheckpoint := newTestSubject(t, "other-worker", dynamo)
+	otherCheckpoint := newCheckpointer(t, "other-worker", dynamo)
 	err = otherCheckpoint.GetLease(&par.ShardStatus{
 		ID:         SHARD_ID,
 		Checkpoint: "",
@@ -152,7 +152,7 @@ func TestLeaseNotAcquiredByCompetingCheckpointer(t *testing.T) {
 
 func TestLeaseCanBeRelinquished(t *testing.T) {
 	dynamo := newDynamoClient(t)
-	checkpoint := newTestSubject(t, "test-worker", dynamo)
+	checkpoint := newCheckpointer(t, "test-worker", dynamo)
 
 	// take the lease
 	err := checkpoint.GetLease(&par.ShardStatus{
@@ -167,7 +167,7 @@ func TestLeaseCanBeRelinquished(t *testing.T) {
 	assert.Nil(t, err)
 
 	// lease should be available to another checkpointer
-	otherCheckpoint := newTestSubject(t, "other-worker", dynamo)
+	otherCheckpoint := newCheckpointer(t, "other-worker", dynamo)
 	err = otherCheckpoint.GetLease(&par.ShardStatus{
 		ID:         SHARD_ID,
 		Checkpoint: "",
@@ -178,7 +178,7 @@ func TestLeaseCanBeRelinquished(t *testing.T) {
 
 func TestCannotRelinquishAnotherWorkersLease(t *testing.T) {
 	dynamo := newDynamoClient(t)
-	otherCheckpoint := newTestSubject(t, "other-worker", dynamo)
+	otherCheckpoint := newCheckpointer(t, "other-worker", dynamo)
 
 	// the other worker already holds the lease
 	err := otherCheckpoint.GetLease(&par.ShardStatus{
@@ -188,7 +188,7 @@ func TestCannotRelinquishAnotherWorkersLease(t *testing.T) {
 	})
 	assert.Nil(t, err)
 
-	checkpoint := newTestSubject(t, "test-worker", dynamo)
+	checkpoint := newCheckpointer(t, "test-worker", dynamo)
 
 	// try to give up the lease when we don't own it
 	err = checkpoint.RemoveLeaseOwner(SHARD_ID)
@@ -206,7 +206,7 @@ func TestCannotRelinquishAnotherWorkersLease(t *testing.T) {
 
 func TestCannotCheckpointWithoutHoldingTheLease(t *testing.T) {
 	dynamo := newDynamoClient(t)
-	otherCheckpoint := newTestSubject(t, "other-worker", dynamo)
+	otherCheckpoint := newCheckpointer(t, "other-worker", dynamo)
 
 	// the other worker already holds the lease
 	err := otherCheckpoint.GetLease(&par.ShardStatus{
@@ -216,7 +216,7 @@ func TestCannotCheckpointWithoutHoldingTheLease(t *testing.T) {
 	})
 	assert.Nil(t, err)
 
-	checkpoint := newTestSubject(t, "test-worker", dynamo)
+	checkpoint := newCheckpointer(t, "test-worker", dynamo)
 
 	// try to give up the lease when we don't own it
 	err = checkpoint.CheckpointSequence(&par.ShardStatus{
@@ -236,7 +236,7 @@ func TestCannotCheckpointWithoutHoldingTheLease(t *testing.T) {
 	assert.Equal(t, ErrLeaseNotAquired, err, "Was granted lease which should not have been available")
 }
 
-func newTestSubject(t *testing.T, workerID string, dynamo *testDynamoClient) *DynamoCheckpoint {
+func newCheckpointer(t *testing.T, workerID string, dynamo *testDynamoClient) *DynamoCheckpoint {
 	kclConfig := cfg.NewKinesisClientLibConfig("appName", "test", "local", "abc").
 		WithInitialPositionInStream(cfg.LATEST).
 		WithMaxRecords(10).
