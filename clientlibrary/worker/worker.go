@@ -189,7 +189,7 @@ func (w *Worker) initialize() error {
 	// Create default dynamodb based checkpointer implementation
 	if w.checkpointer == nil {
 		log.Infof("Creating DynamoDB based checkpointer")
-		w.checkpointer = chk.NewDynamoCheckpoint(w.kclConfig)
+		w.checkpointer = chk.NewDynamoCheckpoint(w.workerID, w.kclConfig)
 	} else {
 		log.Infof("Use custom checkpointer implementation.")
 	}
@@ -200,7 +200,7 @@ func (w *Worker) initialize() error {
 	}
 
 	log.Infof("Initializing Checkpointer")
-	if err := w.checkpointer.Init(w.workerID); err != nil {
+	if err := w.checkpointer.Init(); err != nil {
 		log.Errorf("Failed to start Checkpointer: %+v", err)
 		return err
 	}

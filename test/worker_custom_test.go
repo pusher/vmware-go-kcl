@@ -55,7 +55,7 @@ func TestWorkerInjectCheckpointer(t *testing.T) {
 	kclConfig.WithMonitoringService(getMetricsConfig(kclConfig, metricsSystem))
 
 	// custom checkpointer or a mock checkpointer.
-	checkpointer := chk.NewDynamoCheckpoint(kclConfig)
+	checkpointer := chk.NewDynamoCheckpoint("workerID", kclConfig)
 
 	// Inject a custom checkpointer into the worker.
 	worker := wk.NewWorker(recordProcessorFactory(t), kclConfig).
@@ -162,7 +162,7 @@ func TestWorkerInjectKinesisAndCheckpointer(t *testing.T) {
 	kc := kinesis.New(s)
 
 	// custom checkpointer or a mock checkpointer.
-	checkpointer := chk.NewDynamoCheckpoint(kclConfig)
+	checkpointer := chk.NewDynamoCheckpoint("workerID", kclConfig)
 
 	// Inject both custom checkpointer and kinesis into the worker.
 	worker := wk.NewWorker(recordProcessorFactory(t), kclConfig).

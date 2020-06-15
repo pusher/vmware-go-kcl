@@ -73,9 +73,13 @@ type DynamoCheckpoint struct {
 	Retries       int
 }
 
-func NewDynamoCheckpoint(kclConfig *config.KinesisClientLibConfiguration) *DynamoCheckpoint {
+func NewDynamoCheckpoint(
+	workerID string,
+	kclConfig *config.KinesisClientLibConfiguration,
+) *DynamoCheckpoint {
 	checkpointer := &DynamoCheckpoint{
 		log:                     kclConfig.Logger,
+		workerID:                workerID,
 		TableName:               kclConfig.TableName,
 		leaseTableReadCapacity:  int64(kclConfig.InitialLeaseTableReadCapacity),
 		leaseTableWriteCapacity: int64(kclConfig.InitialLeaseTableWriteCapacity),
@@ -94,10 +98,8 @@ func (checkpointer *DynamoCheckpoint) WithDynamoDB(svc dynamodbiface.DynamoDBAPI
 }
 
 // Init initialises the DynamoDB Checkpoint
-func (checkpointer *DynamoCheckpoint) Init(workerID string) error {
+func (checkpointer *DynamoCheckpoint) Init() error {
 	checkpointer.log.Infof("Creating DynamoDB session")
-
-	checkpointer.workerID = workerID
 
 	s, err := session.NewSession(&aws.Config{
 		Region:      aws.String(checkpointer.kclConfig.RegionName),
